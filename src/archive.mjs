@@ -50,6 +50,52 @@ export class Archive {
     return Promise.all(names.filter(name => name.endsWith('.json')).sort().map(async name =>
       JSON.parse(await readFile(join(this.root, 'receipts', name), 'utf8'))));
   }
+
+  // 保存一次批注采集：来源原始响应作为独立内容对象收存，采集结果只引用其
+  // 凭据，保证批注与正文关系可逐条复核且与原始字节绑定。
+  async saveCollection(payload, sources) {
+    const sourceRefs = [];
+    for (const source of sources) {
+      const receipt = await this.save(source.bytes, {
+        url: source.url,
+        status: source.status,
+        type: source.contentType,
+        role: source.role,
+        capturedBy: 'browser-annotation-collector'
+      });
+      sourceRefs.push({ role: source.role, url: source.url, receiptId: receipt.id, digest: receipt.digest });
+    }
+    const collections = join(this.root, 'collections');
+    await mkdir(collections, { recursive: true });
+    const record = {
+      id: randomUUID(),
+      schemaVersion: payload.schemaVersion,
+      document: payload.document,
+      content: payload.content,
+      threads: payload.threads,
+      portal: payload.portal,
+      collectedAt: payload.collectedAt,
+      sources: sourceRefs
+    };
+    const collectionPath = join(collections, record.id + '.json');
+    const staging = collectionPath + '.pending';
+    const handle = await open(staging, 'wx', 0o600);
+    try {
+      await handle.writeFile(JSON.stringify(record, null, 2));
+      await handle.sync();
+    } finally { await handle.close(); }
+    await rename(staging, collectionPath);
+    await syncDirectory(collections);
+    return record;
+  }
+
+  async listCollections() {
+    let names;
+    try { names = await readdir(join(this.root, 'collections')); }
+    catch (error) { if (error.code === 'ENOENT') return []; throw error; }
+    return Promise.all(names.filter(name => name.endsWith('.json')).sort().map(async name =>
+      JSON.parse(await readFile(join(this.root, 'collections', name), 'utf8'))));
+  }
 }
 
 async function syncDirectory(path) {
