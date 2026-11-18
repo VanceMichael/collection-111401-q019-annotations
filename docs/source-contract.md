@@ -6,6 +6,10 @@
 
 批注输入来自现有页面，不创建新批注。采集记录需要包含引用的文档版本、章节/段落身份以及来源中可验证的文本范围或歧义，不用屏幕像素坐标代替文本关系。页面缩窄会重排但不改变文档版本。
 
+## 采集记录形态
+
+每条批注记录包含 id、author、comment、status、quote、section、version 与 anchor。anchor.state 取 located（附 paragraph、section、start、end、text，来自真实选区）、ambiguous（附 candidates 段落身份列表，没有选区时不伪造偏移）或 missing。集合级 complete 表示正文与批注分页均已取到末页；deleted 仅以来源线程状态为准，未加载的分页不作为删除依据。采集先取齐全部分页再逐条定位，每条定位后清空选区，旧选区不沿用到翻页、展开或版本切换后的内容。
+
 ## 本地演练控制
 
 `GET /_health` 返回服务健康状态；`GET /_audit` 仅返回请求路径、方法和体积，不记录凭据。`POST /_control` 接收 JSON，可调整 generation、mode、clock。控制端点只服务于本地演练，不是资料接口，也不是浏览器业务操作入口。每次重新启动服务都会恢复初始数据；生产接入时不部署此控制面。
